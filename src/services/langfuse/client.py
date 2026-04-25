@@ -79,6 +79,73 @@ class LangfuseTracer:
             return None
 
     @contextmanager
+    def trace_rag_request(
+        self,
+        query: str,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+    ):
+        """Backward-compatible request tracing context for the RAG router."""
+        if not self.client:
+            yield None
+            return
+
+        trace = None
+        try:
+            if hasattr(self.client, "trace"):
+                trace = self.client.trace(
+                    name="rag_request",
+                    user_id=user_id,
+                    session_id=session_id,
+                    input={"query": query},
+                    metadata=metadata or {},
+                    tags=tags,
+                )
+            else:
+                trace_metadata = {"user_id": user_id, "session_id": session_id, **(metadata or {})}
+                trace = self.client.span(
+                    name="rag_request",
+                    input={"query": query},
+                    metadata=trace_metadata,
+                )
+
+            yield trace
+        except Exception as e:
+            logger.error(f"Error creating RAG request trace: {e}")
+            yield None
+        finally:
+            if trace and hasattr(trace, "end"):
+                try:
+                    trace.end()
+                except Exception as e:
+                    logger.error(f"Error ending RAG request trace: {e}")
+
+    def create_span(
+        self,
+        trace,
+        name: str,
+        input_data: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):
+        """Create a child span when a parent trace exists, else a top-level span."""
+        if trace and hasattr(trace, "span"):
+            try:
+                return trace.span(name=name, input=input_data, metadata=metadata or {})
+            except Exception as e:
+                logger.error(f"Error creating child span {name}: {e}")
+
+        if not self.client:
+            return None
+
+        try:
+            return self.client.span(name=name, input=input_data, metadata=metadata or {})
+        except Exception as e:
+            logger.error(f"Error creating span {name}: {e}")
+            return None
+
+    @contextmanager
     def trace_langgraph_agent(
         self,
         name: str,
@@ -378,6 +445,29 @@ class LangfuseTracer:
 
             if update_data:
                 span.update(**update_data)
-            span.end()
         except Exception as e:
             logger.error(f"Error updating span: {e}")
+
+    def end_span(
+        self,
+        span,
+        output: Optional[Any] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        level: Optional[str] = None,
+        status_message: Optional[str] = None,
+    ):
+        """Update a span and then mark it complete."""
+        if not span:
+            return
+
+        try:
+            self.update_span(
+                span,
+                output=output,
+                metadata=metadata,
+                level=level,
+                status_message=status_message,
+            )
+            span.end()
+        except Exception as e:
+            logger.error(f"Error ending span: {e}")
