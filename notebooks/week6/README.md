@@ -112,6 +112,9 @@ curl "http://localhost:8000/api/v1/health"
 ## Resources
 
 - **Notebook**: [week6_cache_testing.ipynb](./week6_cache_testing.ipynb)
+- **`/ask` Flow Guide**: [ask-end-to-end-flow.md](./ask-end-to-end-flow.md)
+- **`/stream` Flow Guide**: [stream-end-to-end-flow.md](./stream-end-to-end-flow.md)
+- **`/hybrid-search/` Flow Guide**: [hybrid-search-end-to-end-flow.md](./hybrid-search-end-to-end-flow.md)
 - **Langfuse Dashboard**: https://cloud.langfuse.com
 - **Redis Documentation**: https://redis.io/docs
 
